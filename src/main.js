@@ -46,8 +46,25 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Detect tablet vs desktop: enable touch overlay for primary touch devices
-if (matchMedia('(pointer: coarse)').matches) {
+const touchAvailable = matchMedia('(pointer: coarse)').matches;
+
+let pauseButton = null;
+function showTouchIfAvailable() {
+  if (!touchAvailable) return;
   touch.enable();
+  if (!pauseButton) {
+    pauseButton = document.createElement('button');
+    pauseButton.className = 'pause-btn';
+    pauseButton.setAttribute('aria-label', 'Pause');
+    pauseButton.addEventListener('click', () => openPause());
+    pauseButton.addEventListener('touchstart', (e) => { e.preventDefault(); openPause(); }, { passive: false });
+    document.body.appendChild(pauseButton);
+  }
+  pauseButton.style.display = 'flex';
+}
+function hideTouch() {
+  touch.disable();
+  if (pauseButton) pauseButton.style.display = 'none';
 }
 
 function resize() {
@@ -77,11 +94,13 @@ function startMatch() {
   state.prevMoves = { p1: null, p2: null };
   state.mode = 'match';
   hideTitle({ overlay });
+  showTouchIfAvailable();
 }
 
 function quitToTitle() {
   state.sim = null;
   state.mode = 'title';
+  hideTouch();
   showTitle({
     overlay,
     onSelect: (mode) => {
@@ -94,11 +113,13 @@ function quitToTitle() {
 function openPause() {
   state.prevMode = 'match';
   state.mode = 'pause';
+  hideTouch();
+  const resume = () => { overlay.innerHTML = ''; state.mode = 'match'; showTouchIfAvailable(); };
   showPause({
     overlay,
-    onResume: () => { overlay.innerHTML = ''; state.mode = 'match'; },
-    onRestartRound: () => { state.sim.resetRound(); overlay.innerHTML = ''; state.mode = 'match'; },
-    onRestartMatch: () => { state.sim.resetMatch(); overlay.innerHTML = ''; state.mode = 'match'; },
+    onResume: resume,
+    onRestartRound: () => { state.sim.resetRound(); resume(); },
+    onRestartMatch: () => { state.sim.resetMatch(); resume(); },
     onConfigure: () => openConfig('pause'),
     onQuit: () => { overlay.innerHTML = ''; quitToTitle(); },
   });
@@ -107,6 +128,7 @@ function openPause() {
 function openConfig(returnTo) {
   state.prevMode = returnTo;
   state.mode = 'config';
+  hideTouch();
   showConfig({
     overlay,
     state,
