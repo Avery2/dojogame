@@ -45,3 +45,10 @@ export function resetRules() {
   localStorage.removeItem(STORAGE);
   return { ...DEFAULT_RULES };
 }
+
+export function resetRulesInPlace(target) {
+  localStorage.removeItem(STORAGE);
+  for (const k of Object.keys(target)) delete target[k];
+  Object.assign(target, DEFAULT_RULES);
+  return target;
+}

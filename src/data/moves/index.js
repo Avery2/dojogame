@@ -38,6 +38,14 @@ export function resetMoves() {
   return cloneMoves(DEFAULT_MOVES);
 }
 
+export function resetMovesInPlace(target) {
+  localStorage.removeItem(STORAGE);
+  const fresh = cloneMoves(DEFAULT_MOVES);
+  for (const k of Object.keys(target)) delete target[k];
+  Object.assign(target, fresh);
+  return target;
+}
+
 function cloneMoves(m) {
   const out = {};
   for (const k of Object.keys(m)) out[k] = JSON.parse(JSON.stringify(m[k]));

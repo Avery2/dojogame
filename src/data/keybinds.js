@@ -57,6 +57,14 @@ export function resetKeybinds() {
   return clone(DEFAULT_KEYBINDS);
 }
 
+export function resetKeybindsInPlace(target) {
+  localStorage.removeItem(KEYS_STORAGE);
+  const fresh = clone(DEFAULT_KEYBINDS);
+  for (const k of Object.keys(target)) delete target[k];
+  Object.assign(target, fresh);
+  return target;
+}
+
 export function loadTouchLayout() {
   try {
     const raw = localStorage.getItem(TOUCH_STORAGE);

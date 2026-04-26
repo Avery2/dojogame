@@ -1,4 +1,4 @@
-import { ACTIONS, keyLabel, saveKeybinds, resetKeybinds, loadKeybinds } from '../../data/keybinds.js';
+import { ACTIONS, keyLabel, saveKeybinds, resetKeybindsInPlace } from '../../data/keybinds.js';
 
 export function renderKeybinds(main, state, onChange) {
   main.innerHTML = '';
@@ -59,7 +59,7 @@ export function renderKeybinds(main, state, onChange) {
   reset.style.marginTop = '18px';
   reset.textContent = 'Reset all keybinds';
   reset.addEventListener('click', () => {
-    state.keybinds = resetKeybinds();
+    resetKeybindsInPlace(state.keybinds);
     onChange();
     renderKeybinds(main, state, onChange);
   });

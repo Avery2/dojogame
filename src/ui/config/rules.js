@@ -1,4 +1,4 @@
-import { saveRules, resetRules, DEFAULT_RULES } from '../../data/rules.js';
+import { saveRules, resetRulesInPlace } from '../../data/rules.js';
 
 export function renderRulesEditor(main, state, onChange) {
   main.innerHTML = '';
@@ -55,7 +55,7 @@ export function renderRulesEditor(main, state, onChange) {
   reset.style.marginTop = '18px';
   reset.textContent = 'Reset rules to defaults';
   reset.addEventListener('click', () => {
-    state.rules = resetRules();
+    resetRulesInPlace(state.rules);
     onChange();
     renderRulesEditor(main, state, onChange);
   });

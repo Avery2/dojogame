@@ -33,6 +33,7 @@ export class Fighter {
     this.airAttackUsed = false;
     this.state = STATES.IDLE;
     this.stateFrame = 0;
+    this.stateDuration = null; // when set, stateFrame >= stateDuration ends the state
     this.currentMove = null;
     this.moveFrame = 0;
     this.moveConnected = false;
@@ -108,7 +109,11 @@ export class Fighter {
         this.onGround = true;
         this.airAttackUsed = false;
         if (this.state === STATES.JUMP) this.transition(STATES.IDLE);
-        if (this.state === STATES.HITSTUN) this.transition(STATES.KNOCKDOWN, 22);
+        if (this.state === STATES.HITSTUN) {
+          if (this._knockdownOnLand) this.transition(STATES.KNOCKDOWN, 22);
+          else this.transition(STATES.IDLE);
+          this._knockdownOnLand = false;
+        }
         if (this.state === STATES.THROWN) this.transition(STATES.KNOCKDOWN, 22);
       }
     }
@@ -133,24 +138,25 @@ export class Fighter {
         break;
       case STATES.BLOCKSTUN:
       case STATES.HITSTUN:
-        this.stateFrame--;
-        if (this.stateFrame <= 0) this.transition(STATES.IDLE);
+        if (this.stateDuration !== null && this.stateFrame >= this.stateDuration) {
+          this.transition(STATES.IDLE);
+        }
         break;
       case STATES.KNOCKDOWN:
-        this.stateFrame--;
-        if (this.stateFrame <= 0) {
+        if (this.stateDuration !== null && this.stateFrame >= this.stateDuration) {
           this.invincible = this.rules.wakeupInvincibleFrames;
           this.transition(STATES.WAKEUP, this.rules.wakeupInvincibleFrames);
         }
         break;
       case STATES.WAKEUP:
-        this.stateFrame--;
-        if (this.stateFrame <= 0) this.transition(STATES.IDLE);
+        if (this.stateDuration !== null && this.stateFrame >= this.stateDuration) {
+          this.transition(STATES.IDLE);
+        }
         break;
       case STATES.THROWN:
-        // Animated by attacker via grabHold; auto-resolved when active->recovery on attacker
-        this.stateFrame--;
-        if (this.stateFrame <= 0) this.transition(STATES.IDLE);
+        if (this.stateDuration !== null && this.stateFrame >= this.stateDuration) {
+          this.transition(STATES.IDLE);
+        }
         break;
       case STATES.KO:
         break;
@@ -263,7 +269,7 @@ export class Fighter {
   transition(state, frames = null, reset = true) {
     this.state = state;
     if (reset) this.stateFrame = 0;
-    if (frames !== null) this.stateFrame = frames;
+    this.stateDuration = (frames !== null) ? frames : null;
   }
 
   receiveHit(move, attacker, sim) {
@@ -287,25 +293,20 @@ export class Fighter {
     this.hitstopFrames = hs;
     attacker.hitstopFrames = hs;
 
-    // Knockback
+    // Knockback. Only knockdown moves (or hits on already-airborne opponents)
+    // launch vertically — otherwise just slide back on the ground.
     const dir = attacker.facing;
     this.vel.x = move.knockback.x * dir;
-    if (move.knockback.y < 0) {
-      this.vel.y = move.knockback.y;
+    const wasAirborne = !this.onGround;
+    if (move.knockdown && this.onGround) {
+      this.vel.y = move.knockback.y || -8;
       this.onGround = false;
+    } else if (wasAirborne && move.knockback.y < 0) {
+      this.vel.y = move.knockback.y;
     }
-    this.pos.x += this.vel.x; // immediate small push
-
-    if (move.knockdown || !this.onGround) {
-      this.transition(STATES.HITSTUN, hitstun);
-      // landing later transitions to KNOCKDOWN
-      if (move.knockdown && this.onGround) {
-        this.vel.y = move.knockback.y || -8;
-        this.onGround = false;
-      }
-    } else {
-      this.transition(STATES.HITSTUN, hitstun);
-    }
+    this.pos.x += this.vel.x;
+    this._knockdownOnLand = move.knockdown || wasAirborne;
+    this.transition(STATES.HITSTUN, hitstun);
 
     sim.fx.push({ type: 'hit', x: this.pos.x, y: this.pos.y - 100, dmg });
     sim.events.push({ kind: 'hit' });
