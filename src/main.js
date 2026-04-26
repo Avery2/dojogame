@@ -62,6 +62,7 @@ function resize() {
   state.rules.stageWidth = w;
   state.rules.stageHeight = h;
   invalidateStage();
+  touch.relayout();
 }
 
 function startMatch() {

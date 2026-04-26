@@ -51,7 +51,7 @@ html, body {
   z-index: 3;
   pointer-events: none;
 }
-#touch-layer.active { pointer-events: auto; }
+/* Layer stays click-through; only the actual buttons capture input. */
 
 .screen {
   position: absolute;
