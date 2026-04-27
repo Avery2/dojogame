@@ -1,5 +1,5 @@
-// Sumi-e stage: paper background with grain, distant brushed mountains, red sun disc.
-// Rendered once to an offscreen canvas and re-blit each frame for cheap grain noise.
+// Pixel-art stage: paper background, blocky mountains, solid sun, hard ground line.
+// Cached to an offscreen canvas because the silhouette doesn't change frame to frame.
 
 let bgCache = null;
 
@@ -7,6 +7,7 @@ export function drawStage(ctx, w, h) {
   if (!bgCache || bgCache.w !== w || bgCache.h !== h) {
     bgCache = buildBackground(w, h);
   }
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(bgCache.canvas, 0, 0);
 }
 
@@ -14,69 +15,79 @@ function buildBackground(w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const cx = c.getContext('2d');
-  // Paper
+  cx.imageSmoothingEnabled = false;
+
+  // Paper / sky
   cx.fillStyle = '#efe7d6';
   cx.fillRect(0, 0, w, h);
 
-  // Sun disc
-  cx.save();
-  cx.fillStyle = 'rgba(179, 35, 27, 0.92)';
-  cx.beginPath();
-  cx.arc(w * 0.72, h * 0.28, Math.min(w, h) * 0.09, 0, Math.PI * 2);
-  cx.fill();
-  cx.restore();
+  // Sun: chunky pixel disc
+  const sunCx = Math.round(w * 0.74);
+  const sunCy = Math.round(h * 0.26);
+  const sunR  = Math.round(Math.min(w, h) * 0.085);
+  pixelCircle(cx, sunCx, sunCy, sunR, '#b3231b', 4);
 
-  // Distant brushed mountains
-  cx.save();
-  cx.strokeStyle = 'rgba(17,17,17,0.55)';
-  cx.lineCap = 'round';
-  cx.lineJoin = 'round';
-  for (let pass = 0; pass < 3; pass++) {
-    cx.lineWidth = [3, 6, 12][pass];
-    cx.globalAlpha = [0.35, 0.5, 0.7][pass];
-    cx.beginPath();
-    const baseY = h * (0.55 + pass * 0.04);
-    cx.moveTo(-20, baseY);
-    let x = -20;
-    while (x < w + 20) {
-      const peak = baseY - 60 - Math.random() * (110 - pass * 20);
-      const dx = 80 + Math.random() * 140;
-      cx.lineTo(x + dx * 0.4, peak);
-      cx.lineTo(x + dx, baseY - 10 + Math.random() * 20);
-      x += dx;
-    }
-    cx.stroke();
+  // Far mountains: a few stepped triangles in dark ink
+  const mtnBaseY = Math.round(h * 0.62);
+  drawMountains(cx, w, mtnBaseY, [
+    { peakY: mtnBaseY - Math.round(h * 0.18), color: '#1a1a1a', step: 6, count: 4 },
+    { peakY: mtnBaseY - Math.round(h * 0.12), color: '#222', step: 4, count: 6 },
+  ]);
+
+  // Ground band
+  const gy = Math.round(h * 0.82);
+  cx.fillStyle = '#111';
+  cx.fillRect(0, gy, w, 4);
+  cx.fillStyle = 'rgba(17,17,17,0.08)';
+  cx.fillRect(0, gy + 4, w, h - gy - 4);
+
+  // Grass tufts every ~80px
+  cx.fillStyle = '#111';
+  for (let x = 0; x < w; x += 80) {
+    cx.fillRect(x + 14, gy - 4, 4, 4);
+    cx.fillRect(x + 18, gy - 8, 4, 4);
+    cx.fillRect(x + 22, gy - 4, 4, 4);
   }
-  cx.restore();
 
-  // Ground line
-  cx.save();
-  cx.strokeStyle = 'rgba(17,17,17,0.7)';
-  cx.lineWidth = 4;
-  cx.beginPath();
-  const gy = h * 0.82;
-  cx.moveTo(0, gy);
-  cx.lineTo(w, gy);
-  cx.stroke();
-  // wash under ground
-  cx.fillStyle = 'rgba(17,17,17,0.05)';
-  cx.fillRect(0, gy, w, h - gy);
-  cx.restore();
-
-  // Grain noise
-  const img = cx.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random() - 0.5) * 18;
-    d[i] = clamp(d[i] + n);
-    d[i+1] = clamp(d[i+1] + n);
-    d[i+2] = clamp(d[i+2] + n);
+  // Stars / dots in upper sky
+  cx.fillStyle = 'rgba(17,17,17,0.25)';
+  for (let i = 0; i < 30; i++) {
+    const x = Math.floor(Math.random() * w / 4) * 4;
+    const y = Math.floor(Math.random() * h * 0.4 / 4) * 4;
+    cx.fillRect(x, y, 4, 4);
   }
-  cx.putImageData(img, 0, 0);
 
   return { canvas: c, w, h };
 }
 
-function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+function pixelCircle(cx, x0, y0, r, color, step) {
+  cx.fillStyle = color;
+  for (let dy = -r; dy <= r; dy += step) {
+    const dx = Math.floor(Math.sqrt(r * r - dy * dy) / step) * step;
+    cx.fillRect(x0 - dx, y0 + dy, dx * 2 + step, step);
+  }
+}
+
+function drawMountains(cx, w, baseY, layers) {
+  for (const layer of layers) {
+    cx.fillStyle = layer.color;
+    const peakSpacing = w / layer.count;
+    for (let i = 0; i < layer.count; i++) {
+      const cxPos = (i + 0.5) * peakSpacing;
+      const peakHeight = baseY - layer.peakY;
+      const halfBase = peakSpacing * 0.55;
+      // Stepped triangle
+      for (let row = 0; row < peakHeight; row += layer.step) {
+        const widthAtRow = halfBase * (1 - row / peakHeight);
+        cx.fillRect(
+          Math.round(cxPos - widthAtRow),
+          Math.round(baseY - row - layer.step),
+          Math.round(widthAtRow * 2),
+          layer.step,
+        );
+      }
+    }
+  }
+}
 
 export function invalidateStage() { bgCache = null; }

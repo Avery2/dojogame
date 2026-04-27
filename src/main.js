@@ -76,6 +76,7 @@ function resize() {
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
   state.rules.stageWidth = w;
   state.rules.stageHeight = h;
   invalidateStage();

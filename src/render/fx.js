@@ -1,4 +1,6 @@
-// Ink splatter on hit, ink trails on heavy swings, block flash, throw burst.
+// Pixel-art FX: chunky red squares for hits, dark squares for trails,
+// gold ring for blocks, "TECH" text on tech.
+
 const trails = []; // active heavy-swing trails
 
 export function spawnTrail(x, y) {
@@ -6,66 +8,68 @@ export function spawnTrail(x, y) {
 }
 
 export function feedTrails(fighter) {
-  if (!(fighter.state === 'active' || fighter.state === 'startup')) return;
+  if (fighter.state !== 'active') return;
   if (!fighter.currentMove) return;
   const m = fighter.moves[fighter.currentMove];
   if (!m?.fx?.trail) return;
   const dx = m.hitbox.dx * fighter.facing;
-  trails.push({ pts: [{ x: fighter.pos.x + dx * 0.6, y: fighter.pos.y + m.hitbox.dy }], life: 10 });
+  trails.push({ pts: [{ x: fighter.pos.x + dx, y: fighter.pos.y + m.hitbox.dy }], life: 8 });
 }
 
 export function drawFx(ctx, sim) {
-  ctx.save();
-  // Trails
-  ctx.lineCap = 'round';
+  ctx.imageSmoothingEnabled = false;
+
+  // Trails (dark pixel ghost squares)
   for (let i = trails.length - 1; i >= 0; i--) {
     const t = trails[i];
     t.life--;
-    ctx.strokeStyle = `rgba(17,17,17,${t.life / 12})`;
-    ctx.lineWidth = 12 * (t.life / 12);
-    ctx.beginPath();
-    for (let p = 0; p < t.pts.length; p++) {
-      if (p === 0) ctx.moveTo(t.pts[p].x, t.pts[p].y);
-      else ctx.lineTo(t.pts[p].x, t.pts[p].y);
+    const a = Math.max(0, t.life / 8);
+    ctx.fillStyle = `rgba(17,17,17,${a})`;
+    for (const p of t.pts) {
+      ctx.fillRect(Math.round(p.x) - 6, Math.round(p.y) - 6, 12, 12);
     }
-    ctx.stroke();
     if (t.life <= 0) trails.splice(i, 1);
   }
 
-  // Hit splatters / blocks / throws / techs
   for (const e of sim.fx) {
     if (e.life === undefined) e.life = 30;
     const alpha = Math.max(0, e.life / 30);
     if (e.type === 'hit') {
       ctx.fillStyle = `rgba(179,35,27,${alpha})`;
-      const r = 60 * (1 - e.life / 30);
+      const r = 30 + (1 - alpha) * 40;
+      // 8 chunky pixel "shards"
       for (let i = 0; i < 8; i++) {
-        const a = i * (Math.PI * 2 / 8) + (e.x * 0.01);
-        ctx.beginPath();
-        ctx.arc(e.x + Math.cos(a) * r, e.y + Math.sin(a) * r * 0.8, 6 + Math.random()*4, 0, Math.PI*2);
-        ctx.fill();
+        const ang = i * (Math.PI * 2 / 8) + e.x * 0.0021;
+        const px = Math.round(e.x + Math.cos(ang) * r);
+        const py = Math.round(e.y + Math.sin(ang) * r * 0.8);
+        ctx.fillRect(px - 4, py - 4, 8, 8);
       }
-      // central splash
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, 18 * alpha + 6, 0, Math.PI*2);
-      ctx.fill();
+      // Center burst
+      const c = Math.round(8 + (1 - alpha) * 12);
+      ctx.fillRect(Math.round(e.x) - c / 2, Math.round(e.y) - c / 2, c, c);
     } else if (e.type === 'block') {
-      ctx.strokeStyle = `rgba(199,155,58,${alpha})`;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, 30 + (1 - alpha) * 30, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.fillStyle = `rgba(199,155,58,${alpha})`;
+      const r = 24 + (1 - alpha) * 24;
+      for (let i = 0; i < 12; i++) {
+        const ang = i * (Math.PI * 2 / 12);
+        const px = Math.round(e.x + Math.cos(ang) * r);
+        const py = Math.round(e.y + Math.sin(ang) * r);
+        ctx.fillRect(px - 3, py - 3, 6, 6);
+      }
     } else if (e.type === 'throw') {
-      ctx.fillStyle = `rgba(17,17,17,${alpha * 0.8})`;
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, 40 * (1 - alpha) + 10, 0, Math.PI*2);
-      ctx.fill();
+      ctx.fillStyle = `rgba(17,17,17,${alpha * 0.85})`;
+      for (let i = 0; i < 16; i++) {
+        const ang = i * (Math.PI * 2 / 16);
+        const r = 20 + (1 - alpha) * 30;
+        const px = Math.round(e.x + Math.cos(ang) * r);
+        const py = Math.round(e.y + Math.sin(ang) * r);
+        ctx.fillRect(px - 4, py - 4, 8, 8);
+      }
     } else if (e.type === 'tech') {
       ctx.fillStyle = `rgba(199,155,58,${alpha})`;
-      ctx.font = 'bold 28px "Yuji Mai", serif';
+      ctx.font = 'bold 28px monospace';
       ctx.textAlign = 'center';
       ctx.fillText('TECH', e.x, e.y);
     }
   }
-  ctx.restore();
 }
